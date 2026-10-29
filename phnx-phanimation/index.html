@@ -270,7 +270,7 @@ a{color:inherit}
         row.className = 'episode-row';
         const info = document.createElement('div');
         const name = document.createElement('b');
-        name.textContent = 'Episode ' + episode.episode_number + ': ' + episode.title;
+        name.textContent = episode.title.toLowerCase().startsWith('episode ' + episode.episode_number + ':') ? episode.title : 'Episode ' + episode.episode_number + ': ' + episode.title;
         const detail = document.createElement('small');
         detail.textContent = episode.access_tier === 'subscriber' || episode.access_tier === 'subscriber_only' ? 'Subscriber access' : 'Released episode';
         info.append(name, detail);
