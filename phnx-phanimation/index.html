@@ -123,7 +123,7 @@ a{color:inherit}
 
   <section class="section" id="catalog" aria-labelledby="catalog-title">
     <div class="section-head">
-      <div><h2 id="catalog-title">Browse the catalog</h2><div class="section-sub">Original stories, ready when you are.</div></div>
+      <div><h2 id="catalog-title">Browse the catalog</h2><div class="section-sub">Live titles from the Phoenix Story Network catalog.</div></div>
       <a class="text-link" href="#formats">Explore formats&nbsp; →</a>
     </div>
     <div class="filters" role="group" aria-label="Filter catalog">
@@ -136,12 +136,12 @@ a{color:inherit}
     <div class="grid" id="catalog-grid">
       <article class="card" data-kind="series" data-title="The Door Opens Phoenix Originals Trial Series">
         <div class="poster" role="img" aria-label="Illustrated placeholder cover for The Door Opens">
-          <span class="poster-tag">Series · Episode 1</span>
-          <span class="poster-mark">The Door<br>Opens</span>
+          <span class="poster-tag">Live PSN catalog</span>
+          <span class="poster-mark">Loading catalog</span>
         </div>
-        <h3>The Door Opens</h3>
-        <p>Phoenix Originals · Series</p>
-        <div class="status">Catalog preview · cover artwork slot</div>
+        <h3>Loading live title…</h3>
+        <p>Phoenix Story Network · Series</p>
+        <div class="status">Fetching published catalog data</div>
       </article>
     </div>
     <div class="empty" id="empty-state">No titles match that search yet.</div>
@@ -168,7 +168,7 @@ a{color:inherit}
 
 <footer class="footer">
   <span>© Rising Phoenix Enterprises · PHNX Phanimation</span>
-  <span>Product preview · Catalog data, viewer sign-in, and protected playback are not connected yet.</span>
+  <span>Live PSN catalog · Viewer sign-in and protected playback are still being built.</span>
 </footer>
 
 <div class="dialog-backdrop" id="dialog-backdrop" role="presentation">
@@ -181,21 +181,110 @@ a{color:inherit}
 </div>
 <script>
 (() => {
+  const API_URL = 'https://oyjmpbuxvfxusmbouldi.supabase.co';
+  const PUBLIC_KEY = "sb_publishable_rwTE4QRlQkzr0R0f5t5ylA_a9zuj0eE";
+  const HEADERS = { apikey: PUBLIC_KEY, Authorization: 'Bearer ' + PUBLIC_KEY, Accept: 'application/json' };
   const grid = document.getElementById('catalog-grid');
-  const cards = [...grid.querySelectorAll('.card')];
   const empty = document.getElementById('empty-state');
   const search = document.getElementById('search');
   let activeFilter = 'all';
+  let titles = [];
+
+  async function getRows(table, query) {
+    const response = await fetch(API_URL + '/rest/v1/' + table + '?' + query, { headers: HEADERS });
+    if (!response.ok) throw new Error('Catalog request failed (' + response.status + ')');
+    return response.json();
+  }
+  function makeCard(title) {
+    const card = document.createElement('article');
+    card.className = 'card';
+    card.dataset.kind = 'series';
+    card.dataset.title = (title.title + ' ' + (title.synopsis || '') + ' ' + (title.genre || '')).toLowerCase();
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', 'View ' + title.title);
+    const poster = document.createElement('div');
+    poster.className = 'poster';
+    poster.setAttribute('role', 'img');
+    poster.setAttribute('aria-label', 'Cover art for ' + title.title);
+    const tag = document.createElement('span');
+    tag.className = 'poster-tag';
+    tag.textContent = title.genre || 'Phoenix Original';
+    const mark = document.createElement('span');
+    mark.className = 'poster-mark';
+    mark.textContent = title.title;
+    poster.append(tag, mark);
+    const heading = document.createElement('h3');
+    heading.textContent = title.title;
+    const sub = document.createElement('p');
+    sub.textContent = (title.genre || 'Original') + ' · Series';
+    const status = document.createElement('div');
+    status.className = 'status';
+    status.textContent = title.access_model === 'subscriber_only' ? 'Subscriber title' : 'Available';
+    card.append(poster, heading, sub, status);
+    card.addEventListener('click', () => openDetails(title));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetails(title); }
+    });
+    return card;
+  }
   function filterCatalog() {
     const term = search.value.trim().toLowerCase();
     let visible = 0;
-    for (const card of cards) {
-      const matchesType = activeFilter === 'all' || card.dataset.kind === activeFilter;
-      const matchesText = card.dataset.title.toLowerCase().includes(term);
+    for (const card of grid.querySelectorAll('.card')) {
+      const matchesType = activeFilter === 'all' || activeFilter === 'series';
+      const matchesText = card.dataset.title.includes(term);
       card.hidden = !(matchesType && matchesText);
       if (!card.hidden) visible++;
     }
-    empty.classList.toggle('show', visible === 0);
+    empty.classList.toggle('show', visible === 0 && titles.length > 0);
+  }
+  async function openDetails(series) {
+    const backdrop = document.getElementById('dialog-backdrop');
+    const titleEl = document.getElementById('dialog-title');
+    const subtitle = backdrop.querySelector('.dialog-top .section-sub');
+    const synopsis = backdrop.querySelector('.dialog > p');
+    const rows = backdrop.querySelectorAll('.episode-row');
+    rows.forEach(row => row.remove());
+    titleEl.textContent = series.title;
+    subtitle.textContent = series.genre || 'Phoenix Original Series';
+    synopsis.textContent = series.synopsis || 'Original series from Rising Phoenix.';
+    const note = document.getElementById('dialog-note');
+    note.textContent = 'Loading released episodes…';
+    backdrop.classList.add('open');
+    try {
+      const query = new URLSearchParams({
+        select: 'episode_number,title,slug,synopsis,access_tier,status',
+        series_id: 'eq.' + series.series_id,
+        status: 'eq.live',
+        order: 'episode_number.asc'
+      });
+      const episodes = await getRows('psn_episodes', query.toString());
+      if (!episodes.length) {
+        note.textContent = 'No released episodes are available yet.';
+        return;
+      }
+      note.textContent = 'Streaming playback is not connected yet. These are published PSN episode records; video files are deliberately not exposed in the public catalog.';
+      for (const episode of episodes) {
+        const row = document.createElement('div');
+        row.className = 'episode-row';
+        const info = document.createElement('div');
+        const name = document.createElement('b');
+        name.textContent = 'Episode ' + episode.episode_number + ': ' + episode.title;
+        const detail = document.createElement('small');
+        detail.textContent = episode.access_tier === 'subscriber' || episode.access_tier === 'subscriber_only' ? 'Subscriber access' : 'Released episode';
+        info.append(name, detail);
+        const play = document.createElement('button');
+        play.className = 'outline';
+        play.type = 'button';
+        play.disabled = true;
+        play.textContent = 'Playback setup pending';
+        row.append(info, play);
+        note.before(row);
+      }
+    } catch (error) {
+      note.textContent = 'Could not load the episode list. ' + error.message;
+    }
   }
   document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
     activeFilter = button.dataset.filter;
@@ -204,20 +293,51 @@ a{color:inherit}
   }));
   search.addEventListener('input', filterCatalog);
   const backdrop = document.getElementById('dialog-backdrop');
-  const close = () => { backdrop.classList.remove('open'); document.getElementById('hero-details').focus(); };
-  const open = () => backdrop.classList.add('open');
-  document.getElementById('hero-details').addEventListener('click', open);
-  document.querySelector('.card').addEventListener('click', open);
+  const closeDialog = () => { backdrop.classList.remove('open'); document.getElementById('hero-details').focus(); };
+  document.getElementById('hero-details').addEventListener('click', () => {
+    if (titles[0]) openDetails(titles[0]);
+    else document.getElementById('catalog').scrollIntoView({behavior:'smooth'});
+  });
   document.getElementById('hero-browse').addEventListener('click', () => document.getElementById('catalog').scrollIntoView({behavior:'smooth'}));
-  document.getElementById('dialog-close').addEventListener('click', close);
-  backdrop.addEventListener('click', event => { if (event.target === backdrop) close(); });
-  document.addEventListener('keydown', event => { if (event.key === 'Escape' && backdrop.classList.contains('open')) close(); });
+  document.getElementById('dialog-close').addEventListener('click', closeDialog);
+  backdrop.addEventListener('click', event => { if (event.target === backdrop) closeDialog(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && backdrop.classList.contains('open')) closeDialog(); });
   document.getElementById('play-button').addEventListener('click', () => {
-    document.getElementById('dialog-note').textContent = 'This preview does not stream video yet. Protected playback will be enabled after the PSN media provider and release authorization path are connected.';
+    document.getElementById('dialog-note').textContent = 'Protected video playback is not connected yet.';
   });
   document.getElementById('signin').addEventListener('click', () => {
-    alert('Viewer sign-in is a planned feature and is not connected in this preview.');
+    alert('Viewer sign-in is not connected in this preview.');
   });
+  (async () => {
+    grid.replaceChildren();
+    const loading = document.createElement('p');
+    loading.className = 'section-sub';
+    loading.textContent = 'Loading live Phoenix catalog…';
+    grid.append(loading);
+    try {
+      const query = new URLSearchParams({
+        select: 'series_id,title,slug,synopsis,genre,access_model,status',
+        status: 'eq.live',
+        order: 'created_at.desc'
+      });
+      titles = await getRows('psn_series', query.toString());
+      grid.replaceChildren();
+      titles.forEach(title => grid.append(makeCard(title)));
+      if (!titles.length) {
+        empty.textContent = 'There are no released titles in the catalog yet.';
+        empty.classList.add('show');
+      } else {
+        empty.textContent = 'No titles match that search yet.';
+        filterCatalog();
+      }
+    } catch (error) {
+      grid.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'section-sub';
+      message.textContent = 'The live catalog could not be loaded. ' + error.message;
+      grid.append(message);
+    }
+  })();
 })();
 </script>
 </body>
