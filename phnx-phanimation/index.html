@@ -391,11 +391,18 @@ a{color:inherit}
     const submit = document.getElementById('auth-submit');
     submit.disabled = true;
     showAuthMessage('Sending your sign-in link…');
-    const { error } = await auth.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname },
-    });
-    submit.disabled = false;
+    let error = null;
+    try {
+      const result = await auth.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + window.location.pathname },
+      });
+      error = result.error;
+    } catch (requestError) {
+      error = requestError;
+    } finally {
+      submit.disabled = false;
+    }
     if (error) showAuthMessage('Could not send the link. ' + error.message, true);
     else showAuthMessage('If this email can sign in, a secure link is on its way. Open it in this browser to finish.');
   });
