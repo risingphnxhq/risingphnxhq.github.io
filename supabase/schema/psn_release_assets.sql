@@ -3,6 +3,7 @@ create table if not exists public.psn_release_assets (
   episode_id uuid not null references public.psn_episodes(episode_id) on delete restrict,
   source_system text not null check (source_system in ('PCC','PMF','PVE','PNG','CEP')),
   source_asset_id text not null check (length(btrim(source_asset_id)) between 1 and 200),
+  cep_job_id uuid references public.cep_v2_jobs(id) on delete restrict,
   bucket_id text not null default 'pmf-animation-private' check (bucket_id = 'pmf-animation-private'),
   object_path text not null check (
     length(btrim(object_path)) between 1 and 1024
@@ -26,6 +27,10 @@ create unique index if not exists psn_one_released_full_asset_per_episode
 
 create index if not exists psn_release_assets_episode_state_idx
   on public.psn_release_assets (episode_id, asset_role, status);
+
+create index if not exists psn_release_assets_cep_job_idx
+  on public.psn_release_assets (cep_job_id)
+  where cep_job_id is not null;
 
 alter table public.psn_release_assets enable row level security;
 revoke all on table public.psn_release_assets from public, anon, authenticated;
