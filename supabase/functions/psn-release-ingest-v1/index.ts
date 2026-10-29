@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
 
   const auth = createClient(supabaseUrl, publishableKey, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: \`Bearer \${token}\` } },
+    global: { headers: { Authorization: 'Bearer ' + token } },
   })
   const { data, error } = await auth.auth.getUser(token)
   if (error || !data.user) return json(401, { error: 'invalid_session' }, origin)
@@ -94,7 +94,6 @@ Deno.serve(async (req: Request) => {
     p_pmf_execution_id: pmfExecutionId,
   })
   if (releaseError || !result || result.ok !== true) {
-    // Detailed evidence stays in trusted server records, never in an untrusted client response.
     return json(409, { error: 'release_evidence_not_eligible' }, origin)
   }
   return json(200, result as Record<string, unknown>, origin)
