@@ -152,8 +152,8 @@ a{color:inherit}
   <section class="section" id="continue">
     <div class="section-head"><div><h2>Continue watching</h2><div class="section-sub">Viewer sign-in is available; saved progress depends on the protected playback build.</div></div></div>
     <div class="shelf">
-      <div class="shelf-item"><span class="pill">Viewer accounts</span><b>Sign in to PHNX</b><p>Your account is ready for the next build step: protected playback and saved progress.</p></div>
-      <div class="shelf-item"><span class="pill">Your list</span><b>Save titles for later</b><p>Build a personal watchlist when PHNX viewer sign-in is connected.</p></div>
+      <div class="shelf-item"><span class="pill">Viewer accounts</span><b>Sign in to PHNX</b><p>Your account is ready for secure playback. Saved progress is the next viewer feature.</p></div>
+      <div class="shelf-item"><span class="pill">Your list</span><b>Save titles for later</b><p>Save titles for later after viewer sign-in is connected.</p></div>
       <div class="shelf-item"><span class="pill">New releases</span><b>Follow a series</b><p>See the next episode when PCC approves and releases it.</p></div>
     </div>
   </section>
@@ -170,7 +170,7 @@ a{color:inherit}
 
 <footer class="footer">
   <span>© Rising Phoenix Enterprises · PHNX Phanimation</span>
-  <span>Live PSN catalog · Viewer sign-in is active; protected playback is still being built.</span>
+  <span>Live PSN catalog · Secure playback gate is active; no episode video has passed release approval yet.</span>
 </footer>
 
 <div class="dialog-backdrop" id="dialog-backdrop" role="presentation">
@@ -333,7 +333,7 @@ a{color:inherit}
         note.textContent = 'No released episodes are available yet.';
         return;
       }
-      note.textContent = 'Streaming playback is not connected yet. These are published PSN episode records; video files are deliberately not exposed in the public catalog.';
+      note.textContent = 'Secure playback is connected. Video is never exposed in the public catalog; pressing Play requests a time-limited private stream, and unreleased episodes remain unavailable.';
       for (const episode of episodes) {
         const row = document.createElement('div');
         row.className = 'episode-row';
