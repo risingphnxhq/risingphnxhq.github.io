@@ -12,6 +12,7 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--white);font:16px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 button,input{font:inherit}
 button{cursor:pointer}
+.auth-dialog form{display:grid;gap:10px;margin-top:20px}.auth-dialog label{font-weight:700}.auth-dialog input{width:100%;height:46px;border-radius:10px;border:1px solid var(--line);background:#ffffff0b;color:white;padding:0 14px}.auth-dialog input:focus{outline:2px solid #f3b64a88}.auth-dialog form .gold{justify-self:start;margin-top:6px}.auth-dialog .section-sub{min-height:1.5em}
 a{color:inherit}
 .topbar{height:72px;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:28px;padding:0 clamp(18px,4vw,64px);background:#090b12ed;border-bottom:1px solid var(--line);backdrop-filter:blur(16px)}
 .brand{display:flex;align-items:center;gap:11px;text-decoration:none;min-width:max-content}
@@ -148,9 +149,9 @@ a{color:inherit}
   </section>
 
   <section class="section" id="continue">
-    <div class="section-head"><div><h2>Continue watching</h2><div class="section-sub">Your place is saved here after viewer accounts and playback are connected.</div></div></div>
+    <div class="section-head"><div><h2>Continue watching</h2><div class="section-sub">Viewer sign-in is available; saved progress depends on the protected playback build.</div></div></div>
     <div class="shelf">
-      <div class="shelf-item"><span class="pill">Coming with viewer accounts</span><b>Pick up where you left off</b><p>Playback progress and resume will appear here for signed-in viewers.</p></div>
+      <div class="shelf-item"><span class="pill">Viewer accounts</span><b>Sign in to PHNX</b><p>Your account is ready for the next build step: protected playback and saved progress.</p></div>
       <div class="shelf-item"><span class="pill">Your list</span><b>Save titles for later</b><p>Build a personal watchlist when PHNX viewer sign-in is connected.</p></div>
       <div class="shelf-item"><span class="pill">New releases</span><b>Follow a series</b><p>See the next episode when PCC approves and releases it.</p></div>
     </div>
@@ -168,7 +169,7 @@ a{color:inherit}
 
 <footer class="footer">
   <span>© Rising Phoenix Enterprises · PHNX Phanimation</span>
-  <span>Live PSN catalog · Viewer sign-in and protected playback are still being built.</span>
+  <span>Live PSN catalog · Viewer sign-in is active; protected playback is still being built.</span>
 </footer>
 
 <div class="dialog-backdrop" id="dialog-backdrop" role="presentation">
@@ -176,14 +177,26 @@ a{color:inherit}
     <div class="dialog-top"><div><h2 id="dialog-title">The Door Opens</h2><div class="section-sub">Phoenix Originals: Trial Series</div></div><button class="close" id="dialog-close" aria-label="Close">×</button></div>
     <p>Episode 1: The Door Opens</p>
     <div class="episode-row"><div><b>Episode 1</b><small>Series premiere</small></div><button class="gold" id="play-button">Play episode</button></div>
-    <div class="dialog-note" id="dialog-note">Playback is not connected in this preview. The production build must request protected playback for an approved PSN release.</div>
+    <div class="dialog-note" id="dialog-note">Protected playback is not connected yet. Only a PCC-approved release with a verified private video asset can be played here.</div>
   </section>
 </div>
+<div class="dialog-backdrop" id="auth-backdrop" role="presentation">
+  <section class="dialog auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="dialog-top"><div><h2 id="auth-title">Sign in to PHNX</h2><div class="section-sub">Use a secure email link. Viewer sign-in does not create a paid subscription.</div></div><button class="close" id="auth-cancel" type="button" aria-label="Close">×</button></div>
+    <form id="auth-form">
+      <label for="auth-email">Email address</label>
+      <input id="auth-email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com">
+      <button class="gold" id="auth-submit" type="submit">Send sign-in link</button>
+    </form>
+    <p id="auth-message" class="section-sub" aria-live="polite">Enter your email and we will send a secure sign-in link.</p>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0"></script>
 <script>
 (() => {
   const API_URL = 'https://oyjmpbuxvfxusmbouldi.supabase.co';
   const PUBLIC_KEY = "sb_publishable_rwTE4QRlQkzr0R0f5t5ylA_a9zuj0eE";
-  const HEADERS = { apikey: PUBLIC_KEY, Authorization: 'Bearer ' + PUBLIC_KEY, Accept: 'application/json' };
+  const HEADERS = { apikey: PUBLIC_KEY, Accept: 'application/json' };
   const grid = document.getElementById('catalog-grid');
   const empty = document.getElementById('empty-state');
   const search = document.getElementById('search');
@@ -305,8 +318,90 @@ a{color:inherit}
   document.getElementById('play-button').addEventListener('click', () => {
     document.getElementById('dialog-note').textContent = 'Protected video playback is not connected yet.';
   });
-  document.getElementById('signin').addEventListener('click', () => {
-    alert('Viewer sign-in is not connected in this preview.');
+  const auth = window.supabase?.createClient(API_URL, PUBLIC_KEY, {
+    auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
+  });
+  const authBackdrop = document.getElementById('auth-backdrop');
+  const authForm = document.getElementById('auth-form');
+  const authEmail = document.getElementById('auth-email');
+  const authMessage = document.getElementById('auth-message');
+  const signInButton = document.getElementById('signin');
+  let viewerAccount = null;
+
+  function showAuthMessage(message, isError = false) {
+    authMessage.textContent = message;
+    authMessage.style.color = isError ? '#ff9a9a' : '';
+  }
+  async function syncViewerAccount(session) {
+    if (!session) {
+      viewerAccount = null;
+      signInButton.textContent = 'Sign in';
+      signInButton.removeAttribute('title');
+      return;
+    }
+    signInButton.textContent = 'Sign out';
+    signInButton.title = 'Signed in to PHNX Phanimation';
+    try {
+      const response = await fetch(API_URL + '/functions/v1/psn-viewer-bootstrap-v1', {
+        method: 'POST',
+        headers: {
+          apikey: PUBLIC_KEY,
+          Authorization: 'Bearer ' + session.access_token,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Viewer account setup failed.');
+      viewerAccount = body.account;
+      showAuthMessage('Your PHNX viewer account is ready. Free access is active; paid access requires a separate subscription.');
+    } catch (error) {
+      viewerAccount = null;
+      showAuthMessage('You are signed in, but we could not prepare your viewer account. ' + error.message, true);
+    }
+  }
+  if (auth) {
+    auth.auth.getSession().then(({ data }) => syncViewerAccount(data.session));
+    auth.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => syncViewerAccount(session), 0);
+    });
+  }
+  signInButton.addEventListener('click', async () => {
+    if (!auth) {
+      showAuthMessage('Sign-in could not load. Refresh the page and try again.', true);
+      authBackdrop.classList.add('open');
+      return;
+    }
+    const { data } = await auth.auth.getSession();
+    if (data.session) {
+      const { error } = await auth.auth.signOut();
+      if (error) showAuthMessage('Could not sign out. Please try again.', true);
+      else showAuthMessage('You are signed out.');
+      return;
+    }
+    showAuthMessage('Enter your email and we will send a secure sign-in link.');
+    authBackdrop.classList.add('open');
+    authEmail.focus();
+  });
+  authForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!auth) return showAuthMessage('Sign-in could not load. Refresh the page and try again.', true);
+    const email = authEmail.value.trim();
+    if (!email) return showAuthMessage('Enter your email address.', true);
+    const submit = document.getElementById('auth-submit');
+    submit.disabled = true;
+    showAuthMessage('Sending your sign-in link…');
+    const { error } = await auth.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname },
+    });
+    submit.disabled = false;
+    if (error) showAuthMessage('Could not send the link. ' + error.message, true);
+    else showAuthMessage('If this email can sign in, a secure link is on its way. Open it in this browser to finish.');
+  });
+  document.getElementById('auth-cancel').addEventListener('click', () => authBackdrop.classList.remove('open'));
+  authBackdrop.addEventListener('click', event => {
+    if (event.target === authBackdrop) authBackdrop.classList.remove('open');
   });
   (async () => {
     grid.replaceChildren();
